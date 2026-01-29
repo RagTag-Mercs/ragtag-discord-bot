@@ -11,17 +11,17 @@ function required(name: string): string {
 export const config = {
   discord: {
     token: required("DISCORD_TOKEN"),
-    clientId: required("CLIENT_ID"),
-    guildId: required("GUILD_ID"),
+    clientId: required("DISCORD_CLIENT_ID"),
+    guildId: required("DISCORD_GUILD_ID"),
   },
   uci: {
     clientId: required("UCI_CLIENT_ID"),
     clientSecret: required("UCI_CLIENT_SECRET"),
     redirectUri:
-      process.env.UCI_REDIRECT_URI ?? "http://localhost:3000/auth/callback",
+      process.env.UCI_REDIRECT_URI ?? "http://localhost:3003/auth/callback",
   },
   database: {
     path: process.env.DATABASE_PATH ?? "./data/bot.db",
   },
-  port: parseInt(process.env.PORT ?? "3000", 10),
+  port: parseInt(process.env.PORT ?? "3003", 10),
 } as const;
