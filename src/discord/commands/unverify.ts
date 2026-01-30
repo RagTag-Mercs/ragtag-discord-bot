@@ -7,6 +7,7 @@ import { db } from "../../db/client.js";
 import { members, guildConfig } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import type { BotCommand } from "./index.js";
+import { config } from "../../config.js";
 
 export const unverifyCommand: BotCommand = {
   data: new SlashCommandBuilder()
@@ -22,6 +23,34 @@ export const unverifyCommand: BotCommand = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId!;
+    const member = interaction.member;
+
+    // Check permissions: Superadmin, Administrator, Moderate Members, OR "Council Member" role
+    const isSuperadmin = config.discord.superadminIds.includes(
+      interaction.user.id
+    );
+    const isAdmin =
+      member &&
+      typeof member.permissions !== "string" &&
+      member.permissions.has(PermissionFlagsBits.Administrator);
+    const canModerate =
+      member &&
+      typeof member.permissions !== "string" &&
+      member.permissions.has(PermissionFlagsBits.ModerateMembers);
+    const hasCouncilRole =
+      member &&
+      "cache" in member.roles &&
+      member.roles.cache.some((role) => role.name === "Council Member");
+
+    if (!isSuperadmin && !isAdmin && !canModerate && !hasCouncilRole) {
+      await interaction.reply({
+        content:
+          "You need Moderate Members permission or the Council Member role to use this command.",
+        ephemeral: true,
+      });
+      return;
+    }
+
     const user = interaction.options.getUser("member", true);
 
     const record = db
