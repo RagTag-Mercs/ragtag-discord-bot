@@ -13,6 +13,10 @@ export const config = {
     token: required("DISCORD_TOKEN"),
     clientId: required("DISCORD_CLIENT_ID"),
     guildId: required("DISCORD_GUILD_ID"),
+    superadminIds: (process.env.DISCORD_SUPERADMIN_IDS ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
   },
   uci: {
     clientId: required("UCI_CLIENT_ID"),
