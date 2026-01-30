@@ -15,6 +15,13 @@
       "when": 1769759195441,
       "tag": "0001_perpetual_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1769801537747,
+      "tag": "0002_clean_dagger",
+      "breakpoints": true
     }
   ]
 }
