@@ -28,6 +28,7 @@ export const guildConfig = sqliteTable("guild_config", {
   callToArmsRoleId: text("call_to_arms_role_id"), // Role that triggers the move
   callToArmsChannelId: text("call_to_arms_channel_id"), // Voice channel to move to
   callToArmsAllowedRoles: text("call_to_arms_allowed_roles").default("[]"), // JSON array of role IDs allowed to trigger
+  callToArmsTriggerChannels: text("call_to_arms_trigger_channels").default("[]"), // JSON array of text channel IDs that can trigger
   // Feature toggles (1 = enabled, 0 = disabled)
   verificationEnabled: integer("verification_enabled").notNull().default(0),
   callToArmsEnabled: integer("call_to_arms_enabled").notNull().default(1),

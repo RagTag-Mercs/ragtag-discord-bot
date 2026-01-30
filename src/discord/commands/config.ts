@@ -33,7 +33,6 @@ export const configCommand: BotCommand = {
   data: new SlashCommandBuilder()
     .setName("config")
     .setDescription("Configure bot settings")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((sub) =>
       sub
         .setName("timeout")
@@ -142,6 +141,30 @@ export const configCommand: BotCommand = {
               opt
                 .setName("role")
                 .setDescription("Role to remove")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("allow-trigger-channel")
+            .setDescription("Add a text channel that can trigger call-to-arms")
+            .addChannelOption((opt) =>
+              opt
+                .setName("channel")
+                .setDescription("Text channel to allow")
+                .addChannelTypes(ChannelType.GuildText)
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("deny-trigger-channel")
+            .setDescription("Remove a text channel from triggering call-to-arms")
+            .addChannelOption((opt) =>
+              opt
+                .setName("channel")
+                .setDescription("Text channel to remove")
+                .addChannelTypes(ChannelType.GuildText)
                 .setRequired(true)
             )
         )
@@ -341,9 +364,55 @@ export const configCommand: BotCommand = {
           content: `**${role.name}** can no longer trigger call-to-arms.`,
           ephemeral: true,
         });
+      } else if (sub === "allow-trigger-channel") {
+        const channel = interaction.options.getChannel("channel", true);
+        const triggerChannels: string[] = JSON.parse(
+          config.callToArmsTriggerChannels ?? "[]"
+        );
+        if (triggerChannels.includes(channel.id)) {
+          await interaction.reply({
+            content: `<#${channel.id}> can already trigger call-to-arms.`,
+            ephemeral: true,
+          });
+          return;
+        }
+        triggerChannels.push(channel.id);
+        db.update(guildConfig)
+          .set({ callToArmsTriggerChannels: JSON.stringify(triggerChannels) })
+          .where(eq(guildConfig.guildId, guildId))
+          .run();
+        await interaction.reply({
+          content: `<#${channel.id}> can now trigger call-to-arms.`,
+          ephemeral: true,
+        });
+      } else if (sub === "deny-trigger-channel") {
+        const channel = interaction.options.getChannel("channel", true);
+        const triggerChannels: string[] = JSON.parse(
+          config.callToArmsTriggerChannels ?? "[]"
+        );
+        const idx = triggerChannels.indexOf(channel.id);
+        if (idx === -1) {
+          await interaction.reply({
+            content: `<#${channel.id}> is not in the allowed trigger channels list.`,
+            ephemeral: true,
+          });
+          return;
+        }
+        triggerChannels.splice(idx, 1);
+        db.update(guildConfig)
+          .set({ callToArmsTriggerChannels: JSON.stringify(triggerChannels) })
+          .where(eq(guildConfig.guildId, guildId))
+          .run();
+        await interaction.reply({
+          content: `<#${channel.id}> can no longer trigger call-to-arms.`,
+          ephemeral: true,
+        });
       } else if (sub === "status") {
         const allowedRoles: string[] = JSON.parse(
           config.callToArmsAllowedRoles ?? "[]"
+        );
+        const triggerChannels: string[] = JSON.parse(
+          config.callToArmsTriggerChannels ?? "[]"
         );
         await interaction.reply({
           content: [
@@ -351,6 +420,7 @@ export const configCommand: BotCommand = {
             `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,
             `Target channel: ${config.callToArmsChannelId ? `<#${config.callToArmsChannelId}>` : "Not set"}`,
             `Allowed roles: ${allowedRoles.length > 0 ? allowedRoles.map((r) => `<@&${r}>`).join(", ") : "None (disabled)"}`,
+            `Trigger channels: ${triggerChannels.length > 0 ? triggerChannels.map((c) => `<#${c}>`).join(", ") : "None (disabled)"}`,
           ].join("\n"),
           ephemeral: true,
         });
@@ -455,6 +525,9 @@ export const configCommand: BotCommand = {
       const ctaAllowed: string[] = JSON.parse(
         config.callToArmsAllowedRoles ?? "[]"
       );
+      const ctaTriggerChannels: string[] = JSON.parse(
+        config.callToArmsTriggerChannels ?? "[]"
+      );
       await interaction.reply({
         content: [
           "**Bot Configuration**",
@@ -471,6 +544,7 @@ export const configCommand: BotCommand = {
           `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,
           `Target channel: ${config.callToArmsChannelId ? `<#${config.callToArmsChannelId}>` : "Not set"}`,
           `Allowed roles: ${ctaAllowed.length > 0 ? ctaAllowed.map((r) => `<@&${r}>`).join(", ") : "None"}`,
+          `Trigger channels: ${ctaTriggerChannels.length > 0 ? ctaTriggerChannels.map((c) => `<#${c}>`).join(", ") : "None"}`,
         ].join("\n"),
         ephemeral: true,
       });

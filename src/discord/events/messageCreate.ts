@@ -52,6 +52,15 @@ export async function onMessageCreate(message: Message) {
     return;
   }
 
+  // Check if this channel is allowed to trigger call-to-arms (deny by default)
+  const triggerChannels: string[] = JSON.parse(
+    guildCfg.callToArmsTriggerChannels ?? "[]"
+  );
+
+  if (!triggerChannels.includes(message.channelId)) {
+    return;
+  }
+
   // Get the target voice channel
   const targetChannel = message.guild.channels.cache.get(
     guildCfg.callToArmsChannelId
