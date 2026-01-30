@@ -36,6 +36,11 @@ async function checkTimeouts(client: Client) {
       .where(eq(guildConfig.guildId, guildId))
       .get();
 
+    // Skip if verification is disabled for this guild
+    if (guild && !guild.verificationEnabled) {
+      continue;
+    }
+
     const timeoutMs = (guild?.timeoutHours ?? 72) * 60 * 60 * 1000;
     const now = Date.now();
 

@@ -49,6 +49,15 @@ export async function onGuildMemberAdd(member: GuildMember) {
     .where(eq(guildConfig.guildId, member.guild.id))
     .get();
 
+  // If verification is disabled, don't send the DM
+  if (guild && !guild.verificationEnabled) {
+    logger.info(
+      { discordId: member.id, guild: member.guild.id },
+      "Verification disabled, skipping DM to new member"
+    );
+    return;
+  }
+
   const timeoutHours = guild?.timeoutHours ?? 72;
 
   const verifyUrl = `${config.uci.redirectUri.replace("/auth/callback", "")}/auth/start?guild=${member.guild.id}&user=${member.id}`;

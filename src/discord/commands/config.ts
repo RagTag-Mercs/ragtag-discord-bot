@@ -8,6 +8,7 @@ import { db } from "../../db/client.js";
 import { guildConfig } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type { BotCommand } from "./index.js";
+import { config } from "../../config.js";
 
 function getOrCreateConfig(guildId: string) {
   let guild = db
@@ -32,7 +33,7 @@ export const configCommand: BotCommand = {
   data: new SlashCommandBuilder()
     .setName("config")
     .setDescription("Configure bot settings")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((sub) =>
       sub
         .setName("timeout")
@@ -152,10 +153,72 @@ export const configCommand: BotCommand = {
     )
     .addSubcommand((sub) =>
       sub.setName("show").setDescription("Show current configuration")
+    )
+    .addSubcommandGroup((group) =>
+      group
+        .setName("feature")
+        .setDescription("Enable or disable bot features")
+        .addSubcommand((sub) =>
+          sub
+            .setName("enable")
+            .setDescription("Enable a bot feature")
+            .addStringOption((opt) =>
+              opt
+                .setName("name")
+                .setDescription("Feature to enable")
+                .setRequired(true)
+                .addChoices(
+                  { name: "verification", value: "verification" },
+                  { name: "call-to-arms", value: "call-to-arms" }
+                )
+            )
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("disable")
+            .setDescription("Disable a bot feature")
+            .addStringOption((opt) =>
+              opt
+                .setName("name")
+                .setDescription("Feature to disable")
+                .setRequired(true)
+                .addChoices(
+                  { name: "verification", value: "verification" },
+                  { name: "call-to-arms", value: "call-to-arms" }
+                )
+            )
+        )
+        .addSubcommand((sub) =>
+          sub.setName("status").setDescription("Show feature status")
+        )
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId!;
+    const member = interaction.member;
+
+    // Check permissions: Superadmin, Administrator, OR "Council Member" role
+    const isSuperadmin = config.discord.superadminIds.includes(
+      interaction.user.id
+    );
+    const isAdmin =
+      member &&
+      typeof member.permissions !== "string" &&
+      member.permissions.has(PermissionFlagsBits.Administrator);
+    const hasCouncilRole =
+      member &&
+      "cache" in member.roles &&
+      member.roles.cache.some((role) => role.name === "Council Member");
+
+    if (!isSuperadmin && !isAdmin && !hasCouncilRole) {
+      await interaction.reply({
+        content:
+          "You need Administrator permission or the Council Member role to use this command.",
+        ephemeral: true,
+      });
+      return;
+    }
+
     const subGroup = interaction.options.getSubcommandGroup(false);
     const sub = interaction.options.getSubcommand();
 
@@ -295,6 +358,64 @@ export const configCommand: BotCommand = {
       return;
     }
 
+    if (subGroup === "feature") {
+      const config = getOrCreateConfig(guildId);
+
+      if (sub === "enable") {
+        const feature = interaction.options.getString("name", true);
+        if (feature === "verification") {
+          db.update(guildConfig)
+            .set({ verificationEnabled: 1 })
+            .where(eq(guildConfig.guildId, guildId))
+            .run();
+          await interaction.reply({
+            content: "✅ **Verification** is now **enabled**. New members will receive verification DMs.",
+            ephemeral: true,
+          });
+        } else if (feature === "call-to-arms") {
+          db.update(guildConfig)
+            .set({ callToArmsEnabled: 1 })
+            .where(eq(guildConfig.guildId, guildId))
+            .run();
+          await interaction.reply({
+            content: "✅ **Call-to-arms** is now **enabled**. Mentioning the trigger role will move members.",
+            ephemeral: true,
+          });
+        }
+      } else if (sub === "disable") {
+        const feature = interaction.options.getString("name", true);
+        if (feature === "verification") {
+          db.update(guildConfig)
+            .set({ verificationEnabled: 0 })
+            .where(eq(guildConfig.guildId, guildId))
+            .run();
+          await interaction.reply({
+            content: "🚫 **Verification** is now **disabled**. New members will not receive verification DMs or be kicked for timeout.",
+            ephemeral: true,
+          });
+        } else if (feature === "call-to-arms") {
+          db.update(guildConfig)
+            .set({ callToArmsEnabled: 0 })
+            .where(eq(guildConfig.guildId, guildId))
+            .run();
+          await interaction.reply({
+            content: "🚫 **Call-to-arms** is now **disabled**. Mentioning the trigger role will have no effect.",
+            ephemeral: true,
+          });
+        }
+      } else if (sub === "status") {
+        await interaction.reply({
+          content: [
+            "**Feature Status**",
+            `Verification: ${config.verificationEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
+            `Call-to-arms: ${config.callToArmsEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
+          ].join("\n"),
+          ephemeral: true,
+        });
+      }
+      return;
+    }
+
     if (sub === "timeout") {
       const hours = interaction.options.getInteger("hours", true);
       getOrCreateConfig(guildId);
@@ -342,7 +463,11 @@ export const configCommand: BotCommand = {
           `Verified role: ${config.verifiedRoleId ? `<@&${config.verifiedRoleId}>` : "Not set"}`,
           `Blocklist: ${blocklist.length > 0 ? blocklist.map((t) => `\`${t}\``).join(", ") : "Empty"}`,
           "",
-          "**Call-to-Arms**",
+          "**Features**",
+          `Verification: ${config.verificationEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
+          `Call-to-arms: ${config.callToArmsEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
+          "",
+          "**Call-to-Arms Settings**",
           `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,
           `Target channel: ${config.callToArmsChannelId ? `<#${config.callToArmsChannelId}>` : "Not set"}`,
           `Allowed roles: ${ctaAllowed.length > 0 ? ctaAllowed.map((r) => `<@&${r}>`).join(", ") : "None"}`,

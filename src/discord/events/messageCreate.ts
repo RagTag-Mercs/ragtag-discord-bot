@@ -24,6 +24,9 @@ export async function onMessageCreate(message: Message) {
 
   if (!guildCfg?.callToArmsRoleId || !guildCfg?.callToArmsChannelId) return;
 
+  // Check if call-to-arms is enabled
+  if (!guildCfg.callToArmsEnabled) return;
+
   // Check if the call-to-arms role was mentioned
   if (!message.mentions.roles.has(guildCfg.callToArmsRoleId)) return;
 

@@ -54,4 +54,21 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_members_rsi_handle
       ON members(rsi_handle);
   `);
+
+  // Add columns that may not exist in older databases
+  const alterStatements = [
+    "ALTER TABLE guild_config ADD COLUMN call_to_arms_role_id TEXT",
+    "ALTER TABLE guild_config ADD COLUMN call_to_arms_channel_id TEXT",
+    "ALTER TABLE guild_config ADD COLUMN call_to_arms_allowed_roles TEXT DEFAULT '[]'",
+    "ALTER TABLE guild_config ADD COLUMN verification_enabled INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE guild_config ADD COLUMN call_to_arms_enabled INTEGER NOT NULL DEFAULT 1",
+  ];
+
+  for (const stmt of alterStatements) {
+    try {
+      sqlite.exec(stmt);
+    } catch {
+      // Column already exists, ignore
+    }
+  }
 }
