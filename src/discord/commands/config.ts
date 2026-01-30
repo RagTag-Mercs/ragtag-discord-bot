@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
+  ChannelType,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { db } from "../../db/client.js";
@@ -94,6 +95,61 @@ export const configCommand: BotCommand = {
           sub.setName("list").setDescription("Show the current blocklist")
         )
     )
+    .addSubcommandGroup((group) =>
+      group
+        .setName("call-to-arms")
+        .setDescription("Configure the call-to-arms voice channel move feature")
+        .addSubcommand((sub) =>
+          sub
+            .setName("role")
+            .setDescription("Set the role that triggers the move when mentioned")
+            .addRoleOption((opt) =>
+              opt
+                .setName("role")
+                .setDescription("The role to monitor for mentions")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("channel")
+            .setDescription("Set the voice channel to move members to")
+            .addChannelOption((opt) =>
+              opt
+                .setName("channel")
+                .setDescription("The target voice channel")
+                .addChannelTypes(ChannelType.GuildVoice)
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("allow-role")
+            .setDescription("Add a role that can trigger call-to-arms")
+            .addRoleOption((opt) =>
+              opt
+                .setName("role")
+                .setDescription("Role to allow (e.g. Officers)")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("deny-role")
+            .setDescription("Remove a role from triggering call-to-arms")
+            .addRoleOption((opt) =>
+              opt
+                .setName("role")
+                .setDescription("Role to remove")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("status")
+            .setDescription("Show call-to-arms configuration")
+        )
+    )
     .addSubcommand((sub) =>
       sub.setName("show").setDescription("Show current configuration")
     ) as SlashCommandBuilder,
@@ -156,6 +212,89 @@ export const configCommand: BotCommand = {
       return;
     }
 
+    if (subGroup === "call-to-arms") {
+      const config = getOrCreateConfig(guildId);
+
+      if (sub === "role") {
+        const role = interaction.options.getRole("role", true);
+        db.update(guildConfig)
+          .set({ callToArmsRoleId: role.id })
+          .where(eq(guildConfig.guildId, guildId))
+          .run();
+        await interaction.reply({
+          content: `Call-to-arms will trigger when **${role.name}** is mentioned.`,
+          ephemeral: true,
+        });
+      } else if (sub === "channel") {
+        const channel = interaction.options.getChannel("channel", true);
+        db.update(guildConfig)
+          .set({ callToArmsChannelId: channel.id })
+          .where(eq(guildConfig.guildId, guildId))
+          .run();
+        await interaction.reply({
+          content: `Call-to-arms will move members to <#${channel.id}>.`,
+          ephemeral: true,
+        });
+      } else if (sub === "allow-role") {
+        const role = interaction.options.getRole("role", true);
+        const allowedRoles: string[] = JSON.parse(
+          config.callToArmsAllowedRoles ?? "[]"
+        );
+        if (allowedRoles.includes(role.id)) {
+          await interaction.reply({
+            content: `**${role.name}** can already trigger call-to-arms.`,
+            ephemeral: true,
+          });
+          return;
+        }
+        allowedRoles.push(role.id);
+        db.update(guildConfig)
+          .set({ callToArmsAllowedRoles: JSON.stringify(allowedRoles) })
+          .where(eq(guildConfig.guildId, guildId))
+          .run();
+        await interaction.reply({
+          content: `**${role.name}** can now trigger call-to-arms.`,
+          ephemeral: true,
+        });
+      } else if (sub === "deny-role") {
+        const role = interaction.options.getRole("role", true);
+        const allowedRoles: string[] = JSON.parse(
+          config.callToArmsAllowedRoles ?? "[]"
+        );
+        const idx = allowedRoles.indexOf(role.id);
+        if (idx === -1) {
+          await interaction.reply({
+            content: `**${role.name}** is not in the allowed list.`,
+            ephemeral: true,
+          });
+          return;
+        }
+        allowedRoles.splice(idx, 1);
+        db.update(guildConfig)
+          .set({ callToArmsAllowedRoles: JSON.stringify(allowedRoles) })
+          .where(eq(guildConfig.guildId, guildId))
+          .run();
+        await interaction.reply({
+          content: `**${role.name}** can no longer trigger call-to-arms.`,
+          ephemeral: true,
+        });
+      } else if (sub === "status") {
+        const allowedRoles: string[] = JSON.parse(
+          config.callToArmsAllowedRoles ?? "[]"
+        );
+        await interaction.reply({
+          content: [
+            "**Call-to-Arms Configuration**",
+            `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,
+            `Target channel: ${config.callToArmsChannelId ? `<#${config.callToArmsChannelId}>` : "Not set"}`,
+            `Allowed roles: ${allowedRoles.length > 0 ? allowedRoles.map((r) => `<@&${r}>`).join(", ") : "None (disabled)"}`,
+          ].join("\n"),
+          ephemeral: true,
+        });
+      }
+      return;
+    }
+
     if (sub === "timeout") {
       const hours = interaction.options.getInteger("hours", true);
       getOrCreateConfig(guildId);
@@ -192,6 +331,9 @@ export const configCommand: BotCommand = {
     } else if (sub === "show") {
       const config = getOrCreateConfig(guildId);
       const blocklist: string[] = JSON.parse(config.blocklist ?? "[]");
+      const ctaAllowed: string[] = JSON.parse(
+        config.callToArmsAllowedRoles ?? "[]"
+      );
       await interaction.reply({
         content: [
           "**Bot Configuration**",
@@ -199,6 +341,11 @@ export const configCommand: BotCommand = {
           `Log channel: ${config.logChannelId ? `<#${config.logChannelId}>` : "Not set"}`,
           `Verified role: ${config.verifiedRoleId ? `<@&${config.verifiedRoleId}>` : "Not set"}`,
           `Blocklist: ${blocklist.length > 0 ? blocklist.map((t) => `\`${t}\``).join(", ") : "Empty"}`,
+          "",
+          "**Call-to-Arms**",
+          `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,
+          `Target channel: ${config.callToArmsChannelId ? `<#${config.callToArmsChannelId}>` : "Not set"}`,
+          `Allowed roles: ${ctaAllowed.length > 0 ? ctaAllowed.map((r) => `<@&${r}>`).join(", ") : "None"}`,
         ].join("\n"),
         ephemeral: true,
       });

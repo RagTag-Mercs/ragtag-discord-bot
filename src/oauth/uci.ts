@@ -2,8 +2,8 @@ import { config } from "../config.js";
 import { logger } from "../index.js";
 
 // TODO: Update these URLs once uci.space API docs are provided
-const UCI_AUTHORIZE_URL = "https://uci.space/oauth/authorize";
-const UCI_TOKEN_URL = "https://uci.space/oauth/token";
+const UCI_AUTHORIZE_URL = "https://uci.space/oauth2/authorize";
+const UCI_TOKEN_URL = "https://uci.space/oauth2/token";
 const UCI_PROFILE_URL = "https://uci.space/api/profile";
 
 export interface UCIProfile {

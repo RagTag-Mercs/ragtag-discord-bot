@@ -9,6 +9,7 @@ import { config } from "../config.js";
 import { onReady } from "./events/ready.js";
 import { onGuildMemberAdd } from "./events/guildMemberAdd.js";
 import { onInteractionCreate } from "./events/interactionCreate.js";
+import { onMessageCreate } from "./events/messageCreate.js";
 import { commands } from "./commands/index.js";
 import { logger } from "../index.js";
 
@@ -18,12 +19,15 @@ export function createDiscordClient(): Client {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent, // Required to read message content for role mentions
+      GatewayIntentBits.GuildVoiceStates, // Required to move members between voice channels
     ],
   });
 
   client.once("ready", onReady);
   client.on("guildMemberAdd", onGuildMemberAdd);
   client.on("interactionCreate", onInteractionCreate);
+  client.on("messageCreate", onMessageCreate);
 
   return client;
 }

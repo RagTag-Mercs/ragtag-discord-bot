@@ -24,6 +24,10 @@ export const guildConfig = sqliteTable("guild_config", {
   blocklist: text("blocklist").default("[]"), // JSON array of org tags
   logChannelId: text("log_channel_id"),
   verifiedRoleId: text("verified_role_id"),
+  // Call-to-arms feature: move members to VC when role is mentioned
+  callToArmsRoleId: text("call_to_arms_role_id"), // Role that triggers the move
+  callToArmsChannelId: text("call_to_arms_channel_id"), // Voice channel to move to
+  callToArmsAllowedRoles: text("call_to_arms_allowed_roles").default("[]"), // JSON array of role IDs allowed to trigger
 });
 
 export const oauthState = sqliteTable("oauth_state", {

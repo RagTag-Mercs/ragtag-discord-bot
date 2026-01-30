@@ -16,7 +16,7 @@ export const lookupCommand: BotCommand = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .addSubcommand((sub) =>
       sub
-        .setName("user")
+        .setName("discord")
         .setDescription("Look up by Discord user")
         .addUserOption((opt) =>
           opt
@@ -27,7 +27,7 @@ export const lookupCommand: BotCommand = {
     )
     .addSubcommand((sub) =>
       sub
-        .setName("handle")
+        .setName("rsi")
         .setDescription("Look up by RSI handle")
         .addStringOption((opt) =>
           opt
@@ -43,7 +43,7 @@ export const lookupCommand: BotCommand = {
 
     let record;
 
-    if (sub === "user") {
+    if (sub === "discord") {
       const user = interaction.options.getUser("member", true);
       record = db
         .select()
