@@ -38,7 +38,13 @@ export async function onMessageCreate(message: Message) {
   );
 
   const member = message.member;
-  if (!member) return;
+  if (!member) {
+    logger.warn(
+      { userId: message.author.id, guildId: message.guild.id },
+      "Call-to-arms: message.member was null"
+    );
+    return;
+  }
 
   const hasRolePermission = allowedRoles.some((roleId) =>
     member.roles.cache.has(roleId)
@@ -58,6 +64,15 @@ export async function onMessageCreate(message: Message) {
   );
 
   if (!triggerChannels.includes(message.channelId)) {
+    logger.info(
+      {
+        userId: message.author.id,
+        guildId: message.guild.id,
+        channelId: message.channelId,
+        allowedChannels: triggerChannels,
+      },
+      "Call-to-arms triggered from non-allowed channel"
+    );
     return;
   }
 
