@@ -417,6 +417,7 @@ export const configCommand: BotCommand = {
         await interaction.reply({
           content: [
             "**Call-to-Arms Configuration**",
+            `Status: ${config.callToArmsEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
             `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,
             `Target channel: ${config.callToArmsChannelId ? `<#${config.callToArmsChannelId}>` : "Not set"}`,
             `Allowed roles: ${allowedRoles.length > 0 ? allowedRoles.map((r) => `<@&${r}>`).join(", ") : "None (disabled)"}`,

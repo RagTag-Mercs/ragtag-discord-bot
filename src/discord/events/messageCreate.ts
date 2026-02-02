@@ -25,10 +25,19 @@ export async function onMessageCreate(message: Message) {
   if (!guildCfg?.callToArmsRoleId || !guildCfg?.callToArmsChannelId) return;
 
   // Check if call-to-arms is enabled
-  if (!guildCfg.callToArmsEnabled) return;
+  if (!guildCfg.callToArmsEnabled) {
+    logger.debug(
+      { guildId: message.guild.id },
+      "Call-to-arms role mentioned but feature is disabled"
+    );
+    return;
+  }
 
   // Check if the call-to-arms role was mentioned
-  if (!message.mentions.roles.has(guildCfg.callToArmsRoleId)) return;
+  if (!message.mentions.roles.has(guildCfg.callToArmsRoleId)) {
+    // Different role was mentioned, not the call-to-arms trigger role
+    return;
+  }
 
   // Check if the author has permission (superadmin or one of the allowed roles)
   const isSuperadmin = config.discord.superadminIds.includes(message.author.id);
