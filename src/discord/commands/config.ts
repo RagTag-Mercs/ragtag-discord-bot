@@ -417,7 +417,7 @@ export const configCommand: BotCommand = {
         await interaction.reply({
           content: [
             "**Call-to-Arms Configuration**",
-            `Status: ${config.callToArmsEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
+            `Status: ${config.callToArmsEnabled === 0 ? "🚫 Disabled" : "✅ Enabled"}`,
             `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,
             `Target channel: ${config.callToArmsChannelId ? `<#${config.callToArmsChannelId}>` : "Not set"}`,
             `Allowed roles: ${allowedRoles.length > 0 ? allowedRoles.map((r) => `<@&${r}>`).join(", ") : "None (disabled)"}`,
@@ -479,7 +479,7 @@ export const configCommand: BotCommand = {
           content: [
             "**Feature Status**",
             `Verification: ${config.verificationEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
-            `Call-to-arms: ${config.callToArmsEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
+            `Call-to-arms: ${config.callToArmsEnabled === 0 ? "🚫 Disabled" : "✅ Enabled"}`,
           ].join("\n"),
           ephemeral: true,
         });
@@ -539,7 +539,7 @@ export const configCommand: BotCommand = {
           "",
           "**Features**",
           `Verification: ${config.verificationEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
-          `Call-to-arms: ${config.callToArmsEnabled ? "✅ Enabled" : "🚫 Disabled"}`,
+          `Call-to-arms: ${config.callToArmsEnabled === 0 ? "🚫 Disabled" : "✅ Enabled"}`,
           "",
           "**Call-to-Arms Settings**",
           `Trigger role: ${config.callToArmsRoleId ? `<@&${config.callToArmsRoleId}>` : "Not set"}`,

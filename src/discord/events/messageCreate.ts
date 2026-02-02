@@ -24,8 +24,8 @@ export async function onMessageCreate(message: Message) {
 
   if (!guildCfg?.callToArmsRoleId || !guildCfg?.callToArmsChannelId) return;
 
-  // Check if call-to-arms is enabled
-  if (!guildCfg.callToArmsEnabled) {
+  // Check if call-to-arms is enabled (default to enabled if null/undefined for backwards compat)
+  if (guildCfg.callToArmsEnabled === 0) {
     logger.debug(
       { guildId: message.guild.id },
       "Call-to-arms role mentioned but feature is disabled"
