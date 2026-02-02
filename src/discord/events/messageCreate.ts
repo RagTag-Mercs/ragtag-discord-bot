@@ -15,6 +15,16 @@ export async function onMessageCreate(message: Message) {
   // Check if any roles were mentioned
   if (message.mentions.roles.size === 0) return;
 
+  logger.debug(
+    {
+      guildId: message.guild.id,
+      channelId: message.channelId,
+      userId: message.author.id,
+      mentionedRoles: [...message.mentions.roles.keys()],
+    },
+    "Role mention detected, checking call-to-arms"
+  );
+
   // Get guild config
   const guildCfg = db
     .select()
@@ -22,7 +32,10 @@ export async function onMessageCreate(message: Message) {
     .where(eq(guildConfig.guildId, message.guild.id))
     .get();
 
-  if (!guildCfg?.callToArmsRoleId || !guildCfg?.callToArmsChannelId) return;
+  if (!guildCfg?.callToArmsRoleId || !guildCfg?.callToArmsChannelId) {
+    logger.debug({ guildId: message.guild.id }, "Call-to-arms not configured for this guild");
+    return;
+  }
 
   // Check if call-to-arms is enabled (default to enabled if null/undefined for backwards compat)
   if (guildCfg.callToArmsEnabled === 0) {
@@ -35,7 +48,14 @@ export async function onMessageCreate(message: Message) {
 
   // Check if the call-to-arms role was mentioned
   if (!message.mentions.roles.has(guildCfg.callToArmsRoleId)) {
-    // Different role was mentioned, not the call-to-arms trigger role
+    logger.debug(
+      {
+        guildId: message.guild.id,
+        mentionedRoles: [...message.mentions.roles.keys()],
+        expectedRole: guildCfg.callToArmsRoleId,
+      },
+      "Role mentioned but not the call-to-arms trigger role"
+    );
     return;
   }
 
@@ -55,13 +75,26 @@ export async function onMessageCreate(message: Message) {
     return;
   }
 
+  const memberRoleIds = [...member.roles.cache.keys()];
   const hasRolePermission = allowedRoles.some((roleId) =>
     member.roles.cache.has(roleId)
   );
 
+  logger.debug(
+    {
+      userId: message.author.id,
+      guildId: message.guild.id,
+      isSuperadmin,
+      allowedRoles,
+      memberRoleIds,
+      hasRolePermission,
+    },
+    "Checking call-to-arms permission"
+  );
+
   if (!isSuperadmin && !hasRolePermission) {
     logger.info(
-      { userId: message.author.id, guildId: message.guild.id },
+      { userId: message.author.id, guildId: message.guild.id, allowedRoles, memberRoleIds },
       "User attempted call-to-arms without permission"
     );
     return;
@@ -107,7 +140,18 @@ export async function onMessageCreate(message: Message) {
 
   // Find all members with the call-to-arms role who are in a voice channel
   const callToArmsRole = message.guild.roles.cache.get(guildCfg.callToArmsRoleId);
-  if (!callToArmsRole) return;
+  if (!callToArmsRole) {
+    logger.warn(
+      { guildId: message.guild.id, roleId: guildCfg.callToArmsRoleId },
+      "Call-to-arms role not found in cache"
+    );
+    return;
+  }
+
+  logger.debug(
+    { guildId: message.guild.id, triggeredBy: message.author.id },
+    "Call-to-arms checks passed, fetching members"
+  );
 
   // Fetch all guild members to ensure we have the full list
   await message.guild.members.fetch();
