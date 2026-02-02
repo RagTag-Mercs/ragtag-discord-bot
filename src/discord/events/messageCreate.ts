@@ -15,7 +15,7 @@ export async function onMessageCreate(message: Message) {
   // Check if any roles were mentioned
   if (message.mentions.roles.size === 0) return;
 
-  logger.debug(
+  logger.info(
     {
       guildId: message.guild.id,
       channelId: message.channelId,
@@ -33,13 +33,13 @@ export async function onMessageCreate(message: Message) {
     .get();
 
   if (!guildCfg?.callToArmsRoleId || !guildCfg?.callToArmsChannelId) {
-    logger.debug({ guildId: message.guild.id }, "Call-to-arms not configured for this guild");
+    logger.info({ guildId: message.guild.id }, "Call-to-arms not configured for this guild");
     return;
   }
 
   // Check if call-to-arms is enabled (default to enabled if null/undefined for backwards compat)
   if (guildCfg.callToArmsEnabled === 0) {
-    logger.debug(
+    logger.info(
       { guildId: message.guild.id },
       "Call-to-arms role mentioned but feature is disabled"
     );
@@ -48,7 +48,7 @@ export async function onMessageCreate(message: Message) {
 
   // Check if the call-to-arms role was mentioned
   if (!message.mentions.roles.has(guildCfg.callToArmsRoleId)) {
-    logger.debug(
+    logger.info(
       {
         guildId: message.guild.id,
         mentionedRoles: [...message.mentions.roles.keys()],
@@ -80,7 +80,7 @@ export async function onMessageCreate(message: Message) {
     member.roles.cache.has(roleId)
   );
 
-  logger.debug(
+  logger.info(
     {
       userId: message.author.id,
       guildId: message.guild.id,
@@ -148,7 +148,7 @@ export async function onMessageCreate(message: Message) {
     return;
   }
 
-  logger.debug(
+  logger.info(
     { guildId: message.guild.id, triggeredBy: message.author.id },
     "Call-to-arms checks passed, fetching members"
   );
