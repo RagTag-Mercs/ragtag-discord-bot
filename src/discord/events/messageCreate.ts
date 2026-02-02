@@ -68,16 +68,23 @@ export async function onMessageCreate(message: Message) {
   }
 
   // Check if this channel is allowed to trigger call-to-arms (deny by default)
+  // Also check parent channel for threads
   const triggerChannels: string[] = JSON.parse(
     guildCfg.callToArmsTriggerChannels ?? "[]"
   );
 
-  if (!triggerChannels.includes(message.channelId)) {
+  const channelToCheck = message.channelId;
+  const parentChannelId = message.channel.isThread() ? message.channel.parentId : null;
+  const isAllowedChannel = triggerChannels.includes(channelToCheck) ||
+    (parentChannelId && triggerChannels.includes(parentChannelId));
+
+  if (!isAllowedChannel) {
     logger.info(
       {
         userId: message.author.id,
         guildId: message.guild.id,
         channelId: message.channelId,
+        parentChannelId,
         allowedChannels: triggerChannels,
       },
       "Call-to-arms triggered from non-allowed channel"
