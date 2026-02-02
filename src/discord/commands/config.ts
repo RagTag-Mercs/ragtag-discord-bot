@@ -9,6 +9,7 @@ import { guildConfig } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type { BotCommand } from "./index.js";
 import { config } from "../../config.js";
+import { logger } from "../../index.js";
 
 function getOrCreateConfig(guildId: string) {
   let guild = db
@@ -219,6 +220,18 @@ export const configCommand: BotCommand = {
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId!;
     const member = interaction.member;
+    const subGroup = interaction.options.getSubcommandGroup(false);
+    const sub = interaction.options.getSubcommand();
+
+    logger.info(
+      {
+        userId: interaction.user.id,
+        username: interaction.user.username,
+        guildId,
+        command: subGroup ? `${subGroup} ${sub}` : sub,
+      },
+      "/config command invoked"
+    );
 
     // Check permissions: Superadmin, Administrator, OR "Council Member" role
     const isSuperadmin = config.discord.superadminIds.includes(
@@ -241,9 +254,6 @@ export const configCommand: BotCommand = {
       });
       return;
     }
-
-    const subGroup = interaction.options.getSubcommandGroup(false);
-    const sub = interaction.options.getSubcommand();
 
     if (subGroup === "blocklist") {
       const config = getOrCreateConfig(guildId);
