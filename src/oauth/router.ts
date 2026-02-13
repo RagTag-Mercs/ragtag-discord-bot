@@ -20,6 +20,8 @@ export function createHttpServer(discord: Client) {
       return reply.status(400).send("Missing guild or user parameter");
     }
 
+    logger.info({ guildId: guild, discordId: user }, "OAuth flow started");
+
     const state = randomBytes(32).toString("hex");
     const now = new Date().toISOString();
 
@@ -28,13 +30,29 @@ export function createHttpServer(discord: Client) {
       .run();
 
     const url = getAuthorizeUrl(state);
+    logger.info({ state: state.slice(0, 8) + "..." }, "Redirecting to UCI authorize");
     return reply.redirect(url);
   });
 
   app.get<{
-    Querystring: { code: string; state: string };
+    Querystring: { code?: string; state?: string; error?: string; error_description?: string };
   }>("/auth/callback", async (request, reply) => {
-    const { code, state } = request.query;
+    const { code, state, error, error_description } = request.query;
+
+    if (error) {
+      logger.error({ error, error_description, state }, "OAuth provider returned an error");
+      return reply
+        .status(400)
+        .type("text/html")
+        .send(
+          `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;padding:2em">` +
+            `<h1>Verification Failed</h1>` +
+            `<p>The identity provider returned an error: <strong>${error}</strong></p>` +
+            `${error_description ? `<p>${error_description}</p>` : ""}` +
+            `<p>Please try again or contact a server moderator.</p>` +
+            `</body></html>`
+        );
+    }
 
     if (!code || !state) {
       return reply.status(400).send("Missing code or state parameter");
@@ -63,8 +81,26 @@ export function createHttpServer(discord: Client) {
     db.delete(oauthState).where(eq(oauthState.state, state)).run();
 
     try {
-      const accessToken = await exchangeCode(code);
+      logger.info({ discordId: stateRecord.discordId, state: state.slice(0, 8) + "..." }, "Exchanging authorization code for token");
+      const accessToken = await exchangeCode(code, state);
+      logger.info({ discordId: stateRecord.discordId }, "Token exchange succeeded, fetching profile");
       const profile = await fetchProfile(accessToken);
+
+      if (!profile) {
+        logger.info({ discordId: stateRecord.discordId }, "No RSI account linked on UCI");
+        return reply
+          .status(400)
+          .type("text/html")
+          .send(
+            `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;padding:2em">` +
+              `<h1>RSI Account Not Linked</h1>` +
+              `<p>Your UCI account does not have a linked RSI account.</p>` +
+              `<p>Please link your RSI account at <a href="https://uci.space/account/linked-accounts">uci.space/account/linked-accounts</a> first, then try verifying again.</p>` +
+              `</body></html>`
+          );
+      }
+
+      logger.info({ discordId: stateRecord.discordId, handle: profile.handle, orgs: profile.orgs.length }, "Profile fetched");
 
       const now = new Date().toISOString();
       const orgsJson = JSON.stringify(profile.orgs);
@@ -105,6 +141,7 @@ export function createHttpServer(discord: Client) {
 
       if (status === "verified" && guild?.verifiedRoleId) {
         await discordMember.roles.add(guild.verifiedRoleId);
+        logger.info({ discordId: stateRecord.discordId, roleId: guild.verifiedRoleId }, "Assigned verified role");
       }
 
       // DM the user
@@ -142,13 +179,18 @@ export function createHttpServer(discord: Client) {
         }
       }
 
+      logger.info(
+        { discordId: stateRecord.discordId, guildId: stateRecord.guildId, handle: profile.handle, status },
+        "Verification complete"
+      );
+
       return reply
         .type("text/html")
         .send(
-          `<html><body style="font-family:sans-serif;text-align:center;padding:2em">` +
+          `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;padding:2em">` +
             `<h1>${status === "flagged" ? "⚠️ Flagged for Review" : "✅ Verified!"}</h1>` +
             `<p>RSI account <strong>${profile.handle}</strong> has been linked to your Discord account.</p>` +
-            `${status === "flagged" ? "<p>Your membership has been flagged for moderator review.</p>" : "<p>You now have full access to the server. You can close this tab.</p>"}` +
+            `${status === "flagged" ? "<p>Your membership has been flagged for moderator review.</p>" : "<p>You now have verified access to the server. You can close this tab.</p>"}` +
             `</body></html>`
         );
     } catch (err) {
@@ -157,7 +199,7 @@ export function createHttpServer(discord: Client) {
         .status(500)
         .type("text/html")
         .send(
-          `<html><body style="font-family:sans-serif;text-align:center;padding:2em">` +
+          `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;padding:2em">` +
             `<h1>Verification Failed</h1>` +
             `<p>Something went wrong during verification. Please try again or contact a server moderator.</p>` +
             `</body></html>`

@@ -18,14 +18,18 @@ export async function onInteractionCreate(interaction: Interaction) {
     await command.execute(interaction);
   } catch (err) {
     logger.error(err, `Error executing command: ${interaction.commandName}`);
-    const reply = {
-      content: "An error occurred while executing this command.",
-      ephemeral: true,
-    };
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(reply);
-    } else {
-      await interaction.reply(reply);
+    try {
+      const reply = {
+        content: "An error occurred while executing this command.",
+        ephemeral: true,
+      };
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(reply);
+      } else {
+        await interaction.reply(reply);
+      }
+    } catch {
+      // Interaction token expired or already acknowledged — nothing we can do
     }
   }
 }

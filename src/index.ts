@@ -5,7 +5,7 @@ import { db, migrate } from "./db/client.js";
 import { startTimeoutChecker } from "./jobs/timeoutChecker.js";
 import pino from "pino";
 
-export const logger = pino({ name: "ragtag-bot" });
+export const logger = pino({ name: "ragtag-bot", level: process.env.LOG_LEVEL ?? "info" });
 
 async function main() {
   logger.info("Starting ragtag-discord-bot...");
