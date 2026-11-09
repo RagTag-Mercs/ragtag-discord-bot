@@ -725,9 +725,3 @@ export { handler as GET, handler as POST };
 Next Steps#
 Device Authorization Guide - For devices with limited input (smart TVs, CLI tools, IoT)
 M2M Integration Guide - For server-to-server authentication
-Architecture Note#
-UCI uses a dual-framework architecture:
-
-API endpoints (/api/v1/*) are powered by FastAPI with JSON responses
-Web UI (/auth/*, /account/*, /admin/*) is powered by Starlette with server-rendered templates
-The OAuth2 endpoints (/oauth2/*) handle both browser redirects and API token requests depending on the operation.

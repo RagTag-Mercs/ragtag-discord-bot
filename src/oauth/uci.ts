@@ -15,16 +15,16 @@ async function getUserinfoUrl(): Promise<string> {
 
   const res = await fetch(UCI_OIDC_DISCOVERY);
   if (res.ok) {
-    const config = (await res.json()) as { userinfo_endpoint?: string };
-    if (config.userinfo_endpoint) {
-      cachedUserinfoUrl = config.userinfo_endpoint;
+    const oidcConfig = (await res.json()) as { userinfo_endpoint?: string };
+    if (oidcConfig.userinfo_endpoint) {
+      cachedUserinfoUrl = oidcConfig.userinfo_endpoint;
       logger.info({ userinfo_endpoint: cachedUserinfoUrl }, "Discovered OIDC userinfo endpoint");
       return cachedUserinfoUrl;
     }
   }
 
-  // Fallback to common OIDC path
-  cachedUserinfoUrl = `${UCI_BASE}/oauth2/userinfo`;
+  // Fallback
+  cachedUserinfoUrl = `${UCI_BASE}/api/v1/oauth2/userinfo`;
   return cachedUserinfoUrl;
 }
 
@@ -58,11 +58,16 @@ export function getAuthorizeUrl(state: string): string {
     response_type: "code",
     state,
     scope: "openid profile rsi",
+    prompt: "consent",
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   });
 
-  return `${UCI_AUTHORIZE_URL}?${params}`;
+  // Use %20 instead of + for space encoding — some OAuth servers parse query strings
+  // per RFC 3986 where + is literal, not a space
+  const url = `${UCI_AUTHORIZE_URL}?${params.toString().replaceAll("+", "%20")}`;
+  logger.info({ authorize_url: url }, "Built UCI authorize URL");
+  return url;
 }
 
 export async function exchangeCode(code: string, state: string): Promise<string> {
@@ -128,6 +133,23 @@ export async function exchangeCode(code: string, state: string): Promise<string>
     }
   }
 
+  // Debug: introspect token to check granted scopes
+  try {
+    const introspectRes = await fetch(`${UCI_BASE}/api/v1/oauth2/introspect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        token: accessToken,
+        client_id: config.uci.clientId,
+        ...(config.uci.clientSecret ? { client_secret: config.uci.clientSecret } : {}),
+      }),
+    });
+    const introspectData = await introspectRes.json();
+    logger.info({ introspection: introspectData }, "Token introspection result");
+  } catch (e) {
+    logger.warn({ err: e }, "Token introspection failed");
+  }
+
   return accessToken;
 }
 
@@ -139,14 +161,14 @@ export async function fetchProfile(accessToken: string): Promise<UCIProfile | nu
 
   if (!response.ok) {
     const text = await response.text();
-    logger.error({ status: response.status, body: text }, "Profile fetch failed");
+    logger.error({ status: response.status, body: text, url: userinfoUrl }, "Profile fetch failed");
     throw new Error(`UCI profile fetch failed: ${response.status}`);
   }
 
   const data = (await response.json()) as Record<string, unknown>;
   logger.info({ userinfo: data }, "UCI userinfo response received");
 
-  // The rsi scope provides linked RSI account data
+  // The rsi field contains linked RSI account data
   const rsi = (data.rsi ?? null) as Record<string, unknown> | null;
 
   if (!rsi || !rsi.handle) {
